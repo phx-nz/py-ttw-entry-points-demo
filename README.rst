@@ -1,140 +1,80 @@
-.. image:: https://github.com/phx-nz/boilerplate/actions/workflows/build.yml/badge.svg
-   :target: https://github.com/phx-nz/boilerplate/actions/workflows/build.yml
-
-Boilerplate
-===========
-Template for new projects.  Fill out this section with a description of the
-purpose/function for your project.
-
-Don't forget to update project details in ``pyproject.toml``, too 😇
+Entry Points Demo
+=================
+This repo shows how you can use entry points to create a pluggable interface for your
+distribution.
 
 Installation
 ------------
-Install via pipenv::
+#. **Activate the virtualenv for the py-ttw-day-3 repo.**
+#. Install this project by running the following command::
 
-   pipenv install --dev
+      pip install .
 
+   .. note::
 
-.. tip::
+      Use ``pip`` instead of ``pipenv`` to avoid adding this distro to your project's
+      ``Pipfile`` and ``Pipfile.lock``.
 
-   The above command installs the project with additional dependencies for
-   developing on your local system.  If you are installing the project onto a
-   non-development environment, use the following command instead::
+#. Switch back to the ``py-ttw-day-3`` directory.
+#. Run the following command::
 
-      pipenv install .
+      git checkout entry-points-demo
 
-Automatic code quality checks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-After installing dependencies, run the following command to install git hooks
-to automatically check code quality before allowing commits::
+#. Lastly, run the following command to verify that it worked::
 
-   pipenv run autohooks activate --mode pipenv
+      pipenv run app-cli --help
 
-Checking code quality
----------------------
-You can manually run code quality checks with the following commands::
+You should see output that looks like this::
 
-   # Check formatting:
-   pipenv run black [file ...]
+   > pipenv run app-cli --help
+   Loading .env environment variables...
 
-   # Run linter
-   pipenv run ruff check --fix [file ...]
+    Usage: python -m cli.main [OPTIONS] COMMAND [ARGS]...
 
-Running Unit Tests
-------------------
-To run the unit tests:
+   ╭─ Options ────────────────────────────────╮
+   │ --help     Show this message and exit.   │
+   ╰──────────────────────────────────────────╯
+   ╭─ Commands ─╮
+   │ extras     │
+   │ generate   │
+   │ profiles   │
+   ╰────────────╯
 
-#. Run tests with the ``tox`` command::
+Note the presence of the ``extras`` command, loaded into your app using entry points.
 
-   pipenv run tox -p
+How does it work?
+=================
+In the app
+----------
+In the ``py-ttw-day-3`` codebase, with the ``entry-points-demo`` branch checked out, you
+can find some additional code in ``src/cli/main.py``:
 
-.. tip::
+.. code-block:: py
 
-   `tox`_ installs your package in a separate virtualenv, to help you catch any
-   issues with your project's packaging, as well as testing your code with
-   different versions of Python.  The trade-off is that it takes a bit longer to
-   run your tests.
+   # Register additional commands from plugins.
+   for e in entry_points(group="app.command"):
+       plugin: typer.Typer = e.load()
 
-   If you just want to run the tests in the current virtualenv, you can use this
-   command instead to get faster feedback::
+       if not isinstance(plugin, typer.Typer):
+           raise TypeError(
+               f"Invalid plugin {e.name} ({type(plugin).__name__}); typer.Typer expected"
+           )
 
-      pipenv run pytest
+       app.add_typer(plugin, name=e.name)
 
-Documentation
--------------
-This project uses `Sphinx`_ to build documentation files.  Source files are
-located in the ``docs`` directory.
+This code looks for packages that have registered entry points using the group name
+"app.command".  For each one that it finds, it loads the corresponding object and adds
+it to the Typer interface via ``app.add_typer()``.
 
-To build the documentation locally:
+In the plugin (this repo)
+-------------------------
+Meanwhile, in this project's `pyproject.toml <./pyproject.toml>`, you can find this
+configuration:
 
-#. Switch to the ``docs`` directory::
+.. code-block:: toml
 
-      cd docs
+   [project.entry-points."app.command"]
+   extras = "entry_points_demo.commands.extras:command"
 
-#. Build the documentation::
-
-      pipenv run make html
-
-Documentation will be built in ``docs/_build/html``.
-
-Releases
---------
-Steps to build releases are based on `Packaging Python Projects Tutorial`_
-
-.. important::
-
-   Make sure to build releases off of the ``main`` branch, and check that all
-   changes from ``develop`` have been merged before creating the release!
-
-1. Build the project
-~~~~~~~~~~~~~~~~~~~~
-#. Delete artefacts from previous builds, if applicable::
-
-    rm dist/*
-
-#. Run the build::
-
-    python -m build
-
-#. The build artefacts will be located in the ``dist`` directory at the top
-   level of the project.
-
-2. Upload to PyPI
-~~~~~~~~~~~~~~~~~
-#. `Create a PyPI API token`_ (you only have to do this once).
-#. Increment the version number in ``pyproject.toml``.
-#. Check that the build artefacts are valid, and fix any errors that it finds::
-
-    python -m twine check dist/*
-
-#. Upload build artefacts to PyPI::
-
-    python -m twine upload dist/*
-
-
-3. Create GitHub release
-~~~~~~~~~~~~~~~~~~~~~~~~
-#. Create a tag and push to GitHub::
-
-    git tag <version>
-    git push <version>
-
-   ``<version>`` must match the updated version number in ``pyproject.toml``.
-
-#. Go to the ``Releases``.
-#. Click ``Draft a new release``.
-#. Select the tag that you created in step 1.
-#. Specify the title of the release (e.g., ``KiaOraTeAo v1.2.3``).
-#. Write a description for the release.  Make sure to include:
-   - Credit for code contributed by community members.
-   - Significant functionality that was added/changed/removed.
-   - Any backwards-incompatible changes and/or migration instructions.
-   - SHA256 hashes of the build artefacts.
-#. GPG-sign the description for the release (ASCII-armoured).
-#. Attach the build artefacts to the release.
-#. Click ``Publish release``.
-
-.. _Create a PyPI API token: https://pypi.org/manage/account/token
-.. _Packaging Python Projects Tutorial: https://packaging.python.org/en/latest/tutorials/packaging-projects
-.. _Sphinx: https://www.sphinx-doc.org
-.. _tox: https://tox.readthedocs.io
+When you ``pip install`` this project into your ``py-ttw-day-3`` virtualenv, this also
+includes the entry points configuration, so that the app can find them when it runs.
